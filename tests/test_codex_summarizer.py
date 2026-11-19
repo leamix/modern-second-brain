@@ -13,6 +13,13 @@ class CodexSummarizerTests(unittest.TestCase):
         self.assertTrue(summarize.configured(self.cfg))
         self.assertFalse(summarize.configured({"provider": "codex_cli"}))
 
+    @patch("shutil.which", return_value="/custom/bin/codex")
+    @patch("brain.summarize.subprocess.run")
+    def test_uses_codex_from_path_without_configured_executable(self, run, which):
+        run.return_value = subprocess.CompletedProcess([], 0, stdout="{}", stderr="")
+        summarize.chat({"provider": "codex_cli", "model": "example"}, "system", "text")
+        self.assertEqual(run.call_args.args[0][0], "/custom/bin/codex")
+
     @patch("brain.summarize.subprocess.run")
     def test_uses_ephemeral_codex_and_passes_private_text_on_stdin(self, run):
         run.return_value = subprocess.CompletedProcess([], 0, stdout='{"title":"test"}', stderr="")

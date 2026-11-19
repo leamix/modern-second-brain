@@ -40,3 +40,10 @@ class ClaudeCliTests(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             summarize.chat({"provider": "claude_cli", "model": "sonnet"}, "system", "private content")
         self.assertNotIn("private content", str(ctx.exception))
+
+    @patch("shutil.which", return_value="/custom/bin/claude")
+    @patch("brain.summarize.subprocess.run")
+    def test_uses_claude_from_path_without_configured_executable(self, run, which):
+        run.return_value = subprocess.CompletedProcess([], 0, stdout="{}", stderr="")
+        summarize.chat({"provider": "claude_cli", "model": "sonnet"}, "system", "text")
+        self.assertEqual(run.call_args.args[0][0], "/custom/bin/claude")

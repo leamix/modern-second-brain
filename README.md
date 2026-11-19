@@ -63,12 +63,13 @@ data/brain.db       сама база (в git не попадает)
 Для авторизованного Codex CLI можно использовать существующий вход ChatGPT, без API-ключа:
 
 ```json
-"llm": {"provider": "codex_cli", "model": "gpt-6-luna", "codex_path": "/opt/homebrew/bin/codex", "batch_limit": 1}
+"llm": {"provider": "codex_cli", "model": "gpt-6-luna", "batch_limit": 1}
 ```
 
 Требуется работающий `codex login status` и доступ к выбранной модели. Для каждой карточки
 создаётся временный вызов Codex без записи сессии; текст записи передаётся модели через Codex.
 Запуски расходуют доступный лимит подписки. Провайдера и модель можно переключить в BrainBar.
+Путь к исполняемому файлу можно переопределить через `codex_path` или `claude_path` в `llm`.
 
 Скопируй `config.example.json` в `config.json` и впиши адрес OpenAI-совместимого API,
 ключ и модель. `config.json` в git не попадает. Ключ можно не хранить в файле,
