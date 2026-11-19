@@ -69,6 +69,8 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
     let key = NSSecureTextField()
     let model = NSComboBox()
     let keyHint = NSTextField(labelWithString: "")
+    var endpointLabel: NSTextField!
+    var keyLabel: NSTextField!
     let feedback = NSTextField(wrappingLabelWithString: "Загружаю настройки…")
     let current = NSTextField(labelWithString: "")
     let jsonMode = NSButton(checkboxWithTitle: "Запрашивать ответ в формате JSON", target: nil, action: nil)
@@ -102,14 +104,14 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
         provider.setAccessibilityLabel("Провайдер")
         view.addSubview(provider)
 
-        view.label("Адрес API", x: 28, y: 174, width: 504, size: 12, weight: .medium)
+        endpointLabel = view.label("Адрес API", x: 28, y: 174, width: 504, size: 12, weight: .medium)
         endpoint.frame = NSRect(x: 28, y: 198, width: 504, height: 25)
         endpoint.placeholderString = "https://api.example.com/v1"
         endpoint.setAccessibilityLabel("Адрес API")
         endpoint.delegate = self
         view.addSubview(endpoint)
 
-        view.label("API-ключ", x: 28, y: 237, width: 504, size: 12, weight: .medium)
+        keyLabel = view.label("API-ключ", x: 28, y: 237, width: 504, size: 12, weight: .medium)
         key.frame = NSRect(x: 28, y: 261, width: 504, height: 25)
         key.setAccessibilityLabel("API-ключ")
         key.delegate = self
@@ -129,7 +131,7 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
         reload.frame = NSRect(x: 440, y: 349, width: 96, height: 32)
         reload.bezelStyle = .rounded
         reload.target = self; reload.action = #selector(loadModels)
-        reload.toolTip = "Загрузить список моделей у выбранного провайдера"
+        reload.toolTip = "Обновить список моделей"
         view.addSubview(reload)
 
         jsonMode.frame = NSRect(x: 26, y: 394, width: 508, height: 24)
@@ -193,7 +195,12 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
         provider.addItems(withTitles: providers.map {
             ($0["custom"] as? Bool ?? false) ? ($0["base_url"] as? String ?? "API") : ($0["name"] as? String ?? "API")
         } + ["Другой провайдер…"])
-        let index = providers.firstIndex { ($0["base_url"] as? String) == (active["base_url"] as? String) }
+        let index = providers.firstIndex {
+            if let id = active["provider_id"] as? String, ["codex_cli"].contains(id) {
+                return $0["provider"] as? String == id
+            }
+            return $0["base_url"] as? String != nil && ($0["base_url"] as? String) == (active["base_url"] as? String)
+        }
         provider.selectItem(at: index ?? providers.count)
         enable(true)
         providerChanged()
@@ -207,6 +214,8 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
     @objc func providerChanged() {
         generation += 1
         let choice = selected
+        let cli = ["codex_cli"].contains(choice["provider"] as? String ?? "")
+        [endpointLabel, endpoint, keyLabel, key, keyHint, jsonMode].forEach { $0?.isHidden = cli }
         endpoint.stringValue = choice["base_url"] as? String ?? ""
         endpoint.isEditable = choice.isEmpty || (choice["custom"] as? Bool ?? false)
         key.stringValue = ""
@@ -219,7 +228,9 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
         model.stringValue = choice["model"] as? String ?? ""
         jsonMode.state = (choice["json_mode"] as? Bool ?? true) ? .on : .off
         reload.isEnabled = true
-        if !choice.isEmpty && (saved || !(choice["requires_key"] as? Bool ?? false)) {
+        if cli {
+            loadModels()
+        } else if !choice.isEmpty && (saved || !(choice["requires_key"] as? Bool ?? false)) {
             loadModels()
         } else {
             message("Укажи настройки, затем обнови список или введи модель вручную.")
@@ -244,6 +255,9 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
     }
 
     func payload() -> [String: Any] {
+        if let id = selected["provider"] as? String, ["codex_cli"].contains(id) {
+            return ["provider": id, "model": model.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)]
+        }
         var data: [String: Any] = ["base_url": endpoint.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
                                    "model": model.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),
                                    "json_mode": jsonMode.state == .on]
