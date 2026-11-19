@@ -44,7 +44,8 @@ class MenubarTests(unittest.TestCase):
         path = self.tmp / "status.json"
         path.write_text(json.dumps(self.status if state is None else state))
         result = subprocess.run([str(self.binary), "--dump", "--status", str(path)],
-                                env={**os.environ, "BRAIN_CONFIG": str(self.config_path), "BRAIN_LLM_API_KEY": ""},
+                                env={**os.environ, "BRAIN_DIR": str(Path(__file__).resolve().parents[1]),
+                                     "BRAIN_CONFIG": str(self.config_path), "BRAIN_LLM_API_KEY": ""},
                                 check=True, capture_output=True, text=True, timeout=15)
         self.assertIn("значок:", result.stdout, "AppKit не запустился: тесту нужен доступ к сессии macOS")
         return result.stdout

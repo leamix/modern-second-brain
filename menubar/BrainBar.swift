@@ -6,7 +6,7 @@ import AppKit
 import ServiceManagement
 
 let home = NSHomeDirectory()
-let brainDir = home + "/brain"
+let brainDir = ProcessInfo.processInfo.environment["BRAIN_DIR"] ?? home + "/brain"
 let statusPath = brainDir + "/data/status.json"
 let logPath = home + "/Library/Logs/brain-sync.log"
 let agentLabel = "com.vladilen.brain-sync"
