@@ -196,7 +196,7 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
             ($0["custom"] as? Bool ?? false) ? ($0["base_url"] as? String ?? "API") : ($0["name"] as? String ?? "API")
         } + ["Другой провайдер…"])
         let index = providers.firstIndex {
-            if let id = active["provider_id"] as? String, ["codex_cli"].contains(id) {
+            if let id = active["provider_id"] as? String, ["codex_cli", "claude_cli"].contains(id) {
                 return $0["provider"] as? String == id
             }
             return $0["base_url"] as? String != nil && ($0["base_url"] as? String) == (active["base_url"] as? String)
@@ -214,7 +214,7 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
     @objc func providerChanged() {
         generation += 1
         let choice = selected
-        let cli = ["codex_cli"].contains(choice["provider"] as? String ?? "")
+        let cli = ["codex_cli", "claude_cli"].contains(choice["provider"] as? String ?? "")
         [endpointLabel, endpoint, keyLabel, key, keyHint, jsonMode].forEach { $0?.isHidden = cli }
         endpoint.stringValue = choice["base_url"] as? String ?? ""
         endpoint.isEditable = choice.isEmpty || (choice["custom"] as? Bool ?? false)
@@ -255,7 +255,7 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
     }
 
     func payload() -> [String: Any] {
-        if let id = selected["provider"] as? String, ["codex_cli"].contains(id) {
+        if let id = selected["provider"] as? String, ["codex_cli", "claude_cli"].contains(id) {
             return ["provider": id, "model": model.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)]
         }
         var data: [String: Any] = ["base_url": endpoint.stringValue.trimmingCharacters(in: .whitespacesAndNewlines),

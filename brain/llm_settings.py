@@ -19,7 +19,7 @@ PROVIDERS = (
     ("Ollama", "http://localhost:11434/v1", False),
 )
 PROFILE_FIELDS = ("model", "api_key", "json_mode", "use_env_key")
-CLI_PROVIDERS = {"codex_cli": "Codex CLI"}
+CLI_PROVIDERS = {"codex_cli": "Codex CLI", "claude_cli": "Claude Code CLI"}
 
 
 def endpoint(value: str) -> str:
@@ -103,6 +103,9 @@ def describe(raw: dict = None) -> dict:
     providers = [{"provider": "codex_cli", "name": "Codex CLI",
                   "model": llm.get("model", "") if llm.get("provider") == "codex_cli"
                   else llm.get("codex_model", "")}]
+    providers.append({"provider": "claude_cli", "name": "Claude Code CLI",
+                      "model": llm.get("model", "") if llm.get("provider") == "claude_cli"
+                      else llm.get("claude_model", "sonnet")})
     for url in urls:
         saved = profile(raw, url)
         providers.append({
@@ -142,6 +145,8 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def models(payload: dict) -> dict:
+    if payload.get("provider") == "claude_cli":
+        return {"models": ["sonnet", "opus", "haiku", "fable"]}
     if payload.get("provider") == "codex_cli":
         cache = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").expanduser() / "models_cache.json"
         try:
@@ -204,11 +209,11 @@ def save(payload: dict) -> dict:
         old_url = endpoint(llm["base_url"]) if llm.get("base_url") else ""
         previous = llm.get("provider")
         if previous in CLI_PROVIDERS:
-            llm["codex_model"] = llm.get("model", "")
+            llm["codex_model" if previous == "codex_cli" else "claude_model"] = llm.get("model", "")
         elif old_url:
             llm.setdefault("profiles", {})[old_url] = profile(raw, old_url)
         llm.update(provider=provider, model=model.strip())
-        llm["codex_model"] = model.strip()
+        llm["codex_model" if provider == "codex_cli" else "claude_model"] = model.strip()
     else:
         chosen = candidate(payload, raw)
         if not chosen.get("model"):
@@ -218,7 +223,7 @@ def save(payload: dict) -> dict:
         profiles = llm.setdefault("profiles", {})
         old_url = endpoint(llm["base_url"]) if llm.get("base_url") else ""
         if llm.get("provider") in CLI_PROVIDERS:
-            llm["codex_model"] = llm.get("model", "")
+            llm["codex_model" if llm["provider"] == "codex_cli" else "claude_model"] = llm.get("model", "")
         elif old_url:
             profiles[old_url] = profile(raw, old_url)
         llm["provider"] = "api"
