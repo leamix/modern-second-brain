@@ -71,6 +71,10 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
     let keyHint = NSTextField(labelWithString: "")
     var endpointLabel: NSTextField!
     var keyLabel: NSTextField!
+    var modelLabel: NSTextField!
+    var separator: NSBox!
+    var note: NSTextField!
+    var cancelButton: NSButton!
     let feedback = NSTextField(wrappingLabelWithString: "Загружаю настройки…")
     let current = NSTextField(labelWithString: "")
     let jsonMode = NSButton(checkboxWithTitle: "Запрашивать ответ в формате JSON", target: nil, action: nil)
@@ -121,7 +125,7 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
         keyHint.textColor = .secondaryLabelColor
         view.addSubview(keyHint)
 
-        view.label("Модель", x: 28, y: 328, width: 504, size: 12, weight: .medium)
+        modelLabel = view.label("Модель", x: 28, y: 328, width: 504, size: 12, weight: .medium)
         model.frame = NSRect(x: 28, y: 352, width: 402, height: 26)
         model.placeholderString = "Выбери из списка или введи название"
         model.completes = true
@@ -142,18 +146,18 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
         feedback.textColor = .secondaryLabelColor
         feedback.setAccessibilityElement(true)
         view.addSubview(feedback)
-        let line = NSBox(frame: NSRect(x: 28, y: 493, width: 504, height: 1))
-        line.boxType = .separator; view.addSubview(line)
-        let note = NSTextField(wrappingLabelWithString:
+        separator = NSBox(frame: NSRect(x: 28, y: 493, width: 504, height: 1))
+        separator.boxType = .separator; view.addSubview(separator)
+        note = NSTextField(wrappingLabelWithString:
             "Изменения применятся при следующем запуске. Готовые карточки сохранятся; текущая обработка продолжится на прежней модели.")
         note.frame = NSRect(x: 28, y: 510, width: 504, height: 38)
         note.font = .systemFont(ofSize: 11)
         note.textColor = .secondaryLabelColor
         view.addSubview(note)
-        let cancel = NSButton(title: "Отмена", target: self, action: #selector(cancel))
-        cancel.frame = NSRect(x: 320, y: 563, width: 100, height: 32)
-        cancel.bezelStyle = .rounded; cancel.keyEquivalent = "\u{1b}"
-        view.addSubview(cancel)
+        cancelButton = NSButton(title: "Отмена", target: self, action: #selector(cancel))
+        cancelButton.frame = NSRect(x: 320, y: 563, width: 100, height: 32)
+        cancelButton.bezelStyle = .rounded; cancelButton.keyEquivalent = "\u{1b}"
+        view.addSubview(cancelButton)
         saveButton.frame = NSRect(x: 424, y: 563, width: 112, height: 32)
         saveButton.bezelStyle = .rounded; saveButton.keyEquivalent = "\r"
         saveButton.target = self; saveButton.action = #selector(save)
@@ -211,11 +215,34 @@ final class ModelSettingsWindow: NSWindowController, NSTextFieldDelegate, NSWind
         return providers.indices.contains(index) ? providers[index] : [:]
     }
 
+    func layoutForProvider(isCLI: Bool) {
+        guard let window = window else { return }
+        let height: CGFloat = isCLI ? 409 : 618
+        var frame = window.frameRect(forContentRect: NSRect(x: 0, y: 0, width: 560, height: height))
+        frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
+        if let visible = window.screen?.visibleFrame {
+            frame.origin.x = max(visible.minX, min(frame.minX, visible.maxX - frame.width))
+            frame.origin.y = frame.height <= visible.height
+                ? max(visible.minY, min(frame.minY, visible.maxY - frame.height))
+                : visible.maxY - frame.height
+        }
+        window.setFrame(frame, display: true)
+        modelLabel.frame.origin.y = isCLI ? 180 : 328
+        model.frame.origin.y = isCLI ? 204 : 352
+        reload.frame.origin.y = isCLI ? 201 : 349
+        feedback.frame.origin.y = isCLI ? 251 : 433
+        separator.frame.origin.y = isCLI ? 300 : 493
+        note.frame.origin.y = isCLI ? 317 : 510
+        cancelButton.frame.origin.y = isCLI ? 365 : 563
+        saveButton.frame.origin.y = isCLI ? 365 : 563
+    }
+
     @objc func providerChanged() {
         generation += 1
         let choice = selected
         let cli = ["codex_cli", "claude_cli"].contains(choice["provider"] as? String ?? "")
         [endpointLabel, endpoint, keyLabel, key, keyHint, jsonMode].forEach { $0?.isHidden = cli }
+        layoutForProvider(isCLI: cli)
         endpoint.stringValue = choice["base_url"] as? String ?? ""
         endpoint.isEditable = choice.isEmpty || (choice["custom"] as? Bool ?? false)
         key.stringValue = ""
