@@ -341,15 +341,25 @@ codex mcp remove brain            # отключить в Codex
 `brain sync` через launchd по часам — в :00, :15, :30 и :45 (если Mac спал, пропущенный запуск
 выполнится при пробуждении), лог — `~/Library/Logs/brain-sync.log`. Не `StartInterval` и не
 `ProcessType: Background`: с ними macOS откладывала запуски на десятки минут.
-Проект лежит в `~/brain`, а не в «Документах»: macOS не пускает фоновые задачи launchd
-в защищённые папки (Документы, Рабочий стол, Загрузки) — там агент падает с «Operation not permitted».
+Храни проект вне защищённых папок (Документы, Рабочий стол, Загрузки): macOS может не пустить
+туда фоновую задачу launchd. Установщик записывает путь этого checkout и домашний каталог в plist.
+Имя файла без `.plist` становится идентификатором агента.
 
 ```bash
-cp launchd/com.vladilen.brain-sync.plist ~/Library/LaunchAgents/
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.vladilen.brain-sync.plist   # включить
-launchctl bootout gui/$(id -u)/com.vladilen.brain-sync                                    # выключить
-rm ~/Library/LaunchAgents/com.vladilen.brain-sync.plist                                   # убрать совсем
-launchctl kickstart gui/$(id -u)/com.vladilen.brain-sync                                  # прогнать сейчас
+agent_label=com.vladilen.brain-sync
+agent_plist="$HOME/Library/LaunchAgents/$agent_label.plist"
+mkdir -p ~/Library/LaunchAgents ~/Library/Logs
+/usr/bin/python3 launchd/render_plist.py "$agent_plist"
+launchctl bootstrap "gui/$(id -u)" "$agent_plist"       # первая загрузка агента
+launchctl kickstart "gui/$(id -u)/$agent_label"         # прогнать сейчас
+```
+
+При переносе проекта сначала обнови plist, затем выгрузи и снова загрузи уже установленного агента.
+Для удаления после `bootout` удали plist.
+
+```bash
+launchctl bootout "gui/$(id -u)/$agent_label"
+launchctl bootstrap "gui/$(id -u)" "$agent_plist"
 ```
 
 ## Значок в строке меню
