@@ -2,6 +2,7 @@
 import datetime
 import json
 import os
+import plistlib
 from pathlib import Path
 import shutil
 import subprocess
@@ -61,6 +62,43 @@ class MenubarTests(unittest.TestCase):
         self.assertIn("    Открыть журнал", menu)
         self.assertNotIn("Синхронизировать сейчас [недоступно]", menu)
         self.assertNotIn("test-secret", menu)
+
+    def test_installed_build_uses_its_configured_project_and_agent(self):
+        project = (self.tmp / "Build & Notes").resolve()
+        source = Path(__file__).resolve().parents[1] / "menubar"
+        shutil.copytree(source, project / "menubar", ignore=shutil.ignore_patterns("build"))
+        label = "example.configured.brain-sync"
+        env = {**os.environ, "BRAIN_AGENT_LABEL": label}
+        env.pop("BRAIN_DIR", None)
+        subprocess.run([str(project / "menubar/build.sh"), "--build-only"],
+                       env=env, check=True, capture_output=True, text=True, timeout=120)
+
+        other_project = (self.tmp / "Other checkout").resolve()
+        (other_project / "bin").mkdir(parents=True)
+        (other_project / "bin/brain").touch()
+        (other_project / "brain").mkdir()
+        (other_project / "brain/__init__.py").touch()
+        installed = other_project / "Applications/BrainBar.app"
+        shutil.copytree(project / "menubar/build/BrainBar.app", installed)
+        agents = self.tmp / "agents"
+        agents.mkdir()
+        (agents / "stale.plist").write_bytes(plistlib.dumps({
+            "Label": "example.stale.brain-sync",
+            "ProgramArguments": [str(other_project / "bin/brain"), "sync"],
+        }))
+        env["BRAIN_LAUNCH_AGENTS_DIR"] = str(agents)
+        env.pop("BRAIN_AGENT_LABEL")
+        command = [str(installed / "Contents/MacOS/BrainBar"), "--dump-paths"]
+        paths = subprocess.check_output(command, env=env, text=True, timeout=15)
+        self.assertEqual(paths.splitlines(), [f"brain_dir={project}", f"agent_label={label}"])
+
+        env["BRAIN_DIR"] = str(other_project)
+        paths = subprocess.check_output(command, env=env, text=True, timeout=15)
+        self.assertEqual(paths.splitlines(), [f"brain_dir={other_project}", "agent_label="])
+        env["BRAIN_AGENT_LABEL"] = "example.override.brain-sync"
+        paths = subprocess.check_output(command, env=env, text=True, timeout=15)
+        self.assertEqual(paths.splitlines(), [f"brain_dir={other_project}",
+                                             "agent_label=example.override.brain-sync"])
 
     def test_active_model_is_distinct_from_next_run_choice(self):
         self.status.update(state="summarize", pid=os.getpid(),

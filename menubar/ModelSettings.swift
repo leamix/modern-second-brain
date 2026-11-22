@@ -11,6 +11,7 @@ enum ModelSettingsError: LocalizedError {
 /// Ключи передаются только через stdin; в ответе Python возвращает лишь безопасные поля.
 enum ModelSettingsClient {
     static func requestSync(_ action: String, payload: [String: Any] = [:]) throws -> [String: Any] {
+        guard !brainDir.isEmpty else { throw ModelSettingsError.message("Не найден каталог проекта BrainBar.") }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: brainDir + "/bin/brain")
         process.arguments = ["model", action]

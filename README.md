@@ -389,6 +389,13 @@ menubar/build.sh --build-only                               # только сб�
 ~/Applications/BrainBar.app/Contents/MacOS/BrainBar --dump  # текст меню без интерфейса
 ```
 
+BrainBar использует путь checkout, из которого его собрали. После переноса проекта приложение
+нужно пересобрать. Кнопка синхронизации по умолчанию запускает `com.vladilen.brain-sync`.
+Если агент установлен под другим именем, передай его при сборке, например
+`BRAIN_AGENT_LABEL=com.example.brain-sync menubar/build.sh`.
+При запуске исполняемого файла можно переопределить настройки переменными `BRAIN_DIR` и
+`BRAIN_AGENT_LABEL`. Для другого checkout укажи его агент явно, чтобы запустить синхронизацию.
+
 ## Панель базы
 
 `bin/brain dashboard --open` (или «Открыть базу» в значке) собирает `data/dashboard.html` и открывает

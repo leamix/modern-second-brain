@@ -1,15 +1,24 @@
 // BrainBar — значок второго мозга в строке меню macOS.
-// Раз в 2 секунды читает ~/brain/data/status.json (его пишет brain sync) и показывает,
+// Раз в 2 секунды читает data/status.json в выбранном проекте (его пишет brain sync) и показывает,
 // что происходит: забирает разговоры (↻), пересказывает (12/40), ошибка (!) или всё спокойно.
 // Сборка: menubar/build.sh. Проверка без интерфейса: BrainBar --dump.
 import AppKit
 import ServiceManagement
 
 let home = NSHomeDirectory()
-let brainDir = ProcessInfo.processInfo.environment["BRAIN_DIR"] ?? home + "/brain"
-let statusPath = brainDir + "/data/status.json"
+let builtBrainDir = Bundle.main.object(forInfoDictionaryKey: "BrainDirectory") as? String ?? ""
+let brainDir: String = {
+    if let override = ProcessInfo.processInfo.environment["BRAIN_DIR"], !override.isEmpty { return override }
+    return builtBrainDir
+}()
+let statusPath = brainDir.isEmpty ? "" : brainDir + "/data/status.json"
 let logPath = home + "/Library/Logs/brain-sync.log"
-let agentLabel = "com.vladilen.brain-sync"
+let agentLabel: String = {
+    guard !brainDir.isEmpty else { return "" }
+    if let override = ProcessInfo.processInfo.environment["BRAIN_AGENT_LABEL"], !override.isEmpty { return override }
+    guard brainDir == builtBrainDir else { return "" }
+    return Bundle.main.object(forInfoDictionaryKey: "BrainAgentLabel") as? String ?? ""
+}()
 let syncInterval: TimeInterval = 15 * 60  // агент запускается в :00, :15, :30 и :45
 let builtinSources: [(key: String, name: String)] = [("claude_code", "Claude Code"), ("codex", "Codex"), ("chatgpt", "ChatGPT")]
 
@@ -421,6 +430,11 @@ final class BrainBar: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func syncNow() {
         guard !busy else { return }
+        guard !agentLabel.isEmpty else {
+            actionError = "Не задан агент синхронизации для этого проекта"
+            refresh()
+            return
+        }
         startingSync = true
         syncRequestedAt = Date()
         syncBaseline = status["last_sync_at"] as? String
@@ -444,6 +458,7 @@ final class BrainBar: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// Свежая HTML-панель базы (brain dashboard) в браузере по умолчанию.
     @objc func openDashboard() {
+        guard !brainDir.isEmpty else { actionError = "Не найден каталог проекта"; refresh(); return }
         actionError = nil
         DispatchQueue.global(qos: .userInitiated).async {
             let code = run(brainDir + "/bin/brain", ["dashboard", "--open"])
@@ -461,11 +476,13 @@ final class BrainBar: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc func openFolder() {
+        guard !brainDir.isEmpty else { actionError = "Не найден каталог проекта"; refresh(); return }
         NSWorkspace.shared.open(URL(fileURLWithPath: brainDir))
     }
 
     /// Карточка и расшифровка — во временный файл, который откроется в текстовом редакторе.
     @objc func openRecord(_ sender: NSMenuItem) {
+        guard !brainDir.isEmpty else { actionError = "Не найден каталог проекта"; refresh(); return }
         guard let id = sender.representedObject as? Int else { return }
         let dir = NSTemporaryDirectory() + "brain-cards"
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
@@ -523,6 +540,10 @@ final class BrainBar: NSObject, NSApplicationDelegate, NSMenuDelegate {
 @main
 struct BrainBarMain {
     static func main() {
+        if CommandLine.arguments.contains("--dump-paths") {
+            print("brain_dir=\(brainDir)\nagent_label=\(agentLabel)")
+            return
+        }
         let app = NSApplication.shared
         let bar = BrainBar()
         if CommandLine.arguments.contains("--dump") {
